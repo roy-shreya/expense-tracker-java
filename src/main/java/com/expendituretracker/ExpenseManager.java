@@ -116,27 +116,13 @@ public class ExpenseManager {
                 if(rows > 0){
                     System.out.println("Expense inserted.");
                 }
-
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
-                if (!note.trim().isEmpty()) {
-                    Expense ex = new Expense(category, amount, note);
-                    expenses.add(ex);
-                    System.out.println("You have entered: " + ex.getCategory() + " for an amount of: " + ex.getAmount() + " with note: " + ex.getNote());
-                }
-                else {
-                    Expense ex = new Expense(category,amount);
-                    expenses.add(ex);
-                    System.out.println("You have entered: " + ex.getCategory() + " for an amount of: " + ex.getAmount() + " without note.");
-                }
-
             System.out.println("Do you want to enter another expense?(Y/N)");
             addMore = sc.next();
         }
-
-        saveExpenses();
         System.out.println("Returning to main menu....\n");
     }
 
