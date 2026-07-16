@@ -16,13 +16,10 @@ public class TestDatabaseConnection {
             ResultSet rs = st.executeQuery("SELECT * FROM expenses");
 
             while (rs.next()) {
-                System.out.println(rs.getString("category") + " - " + rs.getInt("amount"));
+                System.out.println(rs.getString("category") + " - " + rs.getInt("amount") + " - " + rs.getDate("expense_date") + " - " + rs.getString("notes"));
             }
-
         } catch (Exception e) {
-
             e.printStackTrace();
-
         }
     }
 }

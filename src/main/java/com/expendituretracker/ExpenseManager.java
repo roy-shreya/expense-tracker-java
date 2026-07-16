@@ -3,6 +3,8 @@ package com.expendituretracker;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.*;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -11,45 +13,46 @@ public class ExpenseManager {
     static Scanner sc = new Scanner(System.in);
 
     public static void showMenu() throws IOException {
-        int option = 100;
-        Menu[] menuItems = Menu.values();
-        Menu menuItemSelected;
+            int option = 100;
+            Menu[] menuItems = Menu.values();
+            Menu menuItemSelected;
 
-        while(option != menuItems.length) {
-            for (int i = 0; i < menuItems.length; i++) {
-                System.out.printf("%d. %s%n", i + 1, menuItems[i]);
-            }
-            while (true) {
-                System.out.print("Enter the number: ");
-                try {
-                    option = sc.nextInt();
-                    if (option >= 1 && option <= menuItems.length) {
-                        menuItemSelected = menuItems[option - 1];
-                        System.out.println("Option selected: " + option);
-                        System.out.println("Selected: " + menuItemSelected);
-                        break;
-                    } else {
-                        System.out.println("Invalid Menu Option.");
+            while(option != menuItems.length) {
+                for (int i = 0; i < menuItems.length; i++) {
+                    System.out.printf("%d. %s%n", i + 1, menuItems[i]);
+                }
+                while (true) {
+                    System.out.print("Enter the number: ");
+                    try {
+                        option = sc.nextInt();
+                        if (option >= 1 && option <= menuItems.length) {
+                            menuItemSelected = menuItems[option - 1];
+                            System.out.println("Option selected: " + option);
+                            System.out.println("Selected: " + menuItemSelected);
+                            break;
+                        } else {
+                            System.out.println("Invalid Menu Option.");
+                        }
+                    } catch (Exception e) {
+                        System.out.println("The input should be a number");
+                        sc.nextLine();
                     }
-                } catch (Exception e) {
-                    System.out.println("The input should be a number");
-                    sc.nextLine();
+                }
+
+                switch (menuItemSelected) {
+                    case ADD_EXPENSE -> addExpense();
+                    case VIEW_EXPENSES -> viewExpenses();
+                    case TOTAL_EXPENSES -> totalExpenses();
+                    case DELETE_EXPENSE -> deleteExpenses();
+                    case EDIT_EXPENSE -> editExpense();
+                    case MONTHLY_SUMMARY -> monthlySummary();
+                    case SEARCH_EXPENSE -> searchExpense();
+                    case EXIT -> {
+                        System.out.println("Thank you for using the tool!");
+                        sc.close();
+                    }
                 }
             }
-
-            switch (menuItemSelected) {
-                case ADD_EXPENSE -> addExpense();
-                case VIEW_EXPENSES -> viewExpenses();
-                case TOTAL_EXPENSES -> totalExpenses();
-                case DELETE_EXPENSE -> deleteExpenses();
-                case EDIT_EXPENSE -> editExpense();
-                case MONTHLY_SUMMARY -> monthlySummary();
-                case SEARCH_EXPENSE -> searchExpense();
-                case EXIT -> {
-                    System.out.println("Thank you for using the tool!");
-                    sc.close();}
-            }
-        }
     }
 
     public static void loadExpenses() throws IOException {
@@ -96,68 +99,116 @@ public class ExpenseManager {
             amount = getAmountInput();
             note = getNoteInput();
 
-            if (!note.trim().isEmpty()) {
-                Expense ex = new Expense(category, amount, note);
-                expenses.add(ex);
-                System.out.println("You have entered: " + ex.getCategory() + " for an amount of: " + ex.getAmount() + " with note: " + ex.getNote());
+            try (Connection connection = DatabaseConnection.createConnection()) {
+
+                System.out.println("Connected successfully!");
+                System.out.println(connection);
+                String sql = "INSERT INTO expenses(category, amount, expense_date, notes) VALUES (?, ?, ?, ?)";
+
+                PreparedStatement ps = connection.prepareStatement(sql);
+
+                ps.setString(1, category.name());
+                ps.setDouble(2, amount);
+                ps.setDate(3, Date.valueOf(LocalDate.now()));
+                ps.setString(4, note);
+
+                int rows = ps.executeUpdate();
+                if(rows > 0){
+                    System.out.println("Expense inserted.");
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            else {
-                Expense ex = new Expense(category,amount);
-                expenses.add(ex);
-                System.out.println("You have entered: " + ex.getCategory() + " for an amount of: " + ex.getAmount() + " without note.");
-            }
+
+                if (!note.trim().isEmpty()) {
+                    Expense ex = new Expense(category, amount, note);
+                    expenses.add(ex);
+                    System.out.println("You have entered: " + ex.getCategory() + " for an amount of: " + ex.getAmount() + " with note: " + ex.getNote());
+                }
+                else {
+                    Expense ex = new Expense(category,amount);
+                    expenses.add(ex);
+                    System.out.println("You have entered: " + ex.getCategory() + " for an amount of: " + ex.getAmount() + " without note.");
+                }
 
             System.out.println("Do you want to enter another expense?(Y/N)");
             addMore = sc.next();
         }
+
         saveExpenses();
         System.out.println("Returning to main menu....\n");
     }
 
     public static void viewExpenses() {
-        if (expenses.isEmpty()) {
-            System.out.println("There are no expenses...returning to menu");
-            return;
-        }
-        System.out.print("Do you want to sort?(Y/Yes for Yes): ");
-        String sortIp = sc.next();
-        if (sortIp.equalsIgnoreCase("Y") || sortIp.equalsIgnoreCase("Yes")) {
-            System.out.println("1. Sort by Category");
-            System.out.println("2. Sort by Amount");
-            System.out.println("3. Sort by Date");
-            while (true) {
-                try {
-                    System.out.print("Enter a option: ");
-                    int sortOption = sc.nextInt();
-                    if (sortOption >= 1 && sortOption <= 3) {
-                        ArrayList<Expense> sortedExpenses = new ArrayList<>(expenses);
-                        switch (sortOption) {
-                            case 1 -> sortedExpenses.sort(Comparator.comparing(Expense::getCategory));
-                            case 2 -> sortedExpenses.sort(Comparator.comparingDouble(Expense::getAmount));
-                            case 3 -> sortedExpenses.sort(Comparator.comparing(Expense::getDate));
-                            default -> System.out.println("Invalid option.");
+        try (Connection connection = DatabaseConnection.createConnection()) {
+
+            System.out.println("Connected successfully!");
+            System.out.println(connection);
+            Statement st = connection.createStatement();
+            ResultSet rs = st.executeQuery("SELECT * FROM expenses");
+
+            if (!rs.next()) {
+                System.out.println("There are no expenses...returning to menu");
+                return;
+            }
+            else {
+                System.out.print("Do you want to sort?(Y/Yes for Yes): ");
+                String sortIp = sc.next();
+                if (sortIp.equalsIgnoreCase("Y") || sortIp.equalsIgnoreCase("Yes")) {
+                    System.out.println("1. Sort by Category");
+                    System.out.println("2. Sort by Amount");
+                    System.out.println("3. Sort by Date");
+                    while (true) {
+                        try {
+                            System.out.print("Enter a option: ");
+                            int sortOption = sc.nextInt();
+                            if (sortOption >= 1 && sortOption <= 3) {
+                                System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
+                                switch (sortOption) {
+                                    case 1 -> rs = st.executeQuery("SELECT * FROM expenses ORDER BY category");
+                                    case 2 -> rs = st.executeQuery("SELECT * FROM expenses ORDER BY amount");
+                                    case 3 -> rs = st.executeQuery("SELECT * FROM expenses ORDER BY expense_date");
+                                    default -> System.out.println("Invalid option.");
+                                }
+                                break;
+                            }
+                            else {
+                                System.out.println("Invalid Menu Option.");
+                            }
+                        } catch (InputMismatchException e) {
+                            System.out.println("Invalid Input.");
+                            sc.next();
                         }
-                        System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
-                        for (int i = 0; i < sortedExpenses.size(); i++) {
-                            Expense ex = sortedExpenses.get(i);
-                            System.out.println((i + 1) + ".  " + ex);
-                        }
-                        break;
-                    } else {
-                        System.out.println("Invalid Menu Option.");
                     }
-                } catch (InputMismatchException e) {
-                    System.out.println("Invalid Input.");
-                    sc.next();
+
+
+                    System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
+                    while (rs.next()) {
+                        System.out.printf("%-2s. %-15s : ₹%10.2f : %s : %s\n",
+                                rs.getInt("expense_id"),
+                                rs.getString("category"),
+                                rs.getDouble("amount"),
+                                rs.getDate("expense_date"),
+                                rs.getString("notes")
+                        );
+                    }
+                }
+                else {
+                    System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
+                    do {
+                        System.out.printf("%2s. %-15s : ₹%10.2f : %s : %s\n",
+                                rs.getInt("expense_id"),
+                                rs.getString("category"),
+                                rs.getDouble("amount"),
+                                rs.getDate("expense_date"),
+                                rs.getString("notes")
+                        );
+                    } while (rs.next());
                 }
             }
-        }
-        else {
-            System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
-            for (int i = 0; i < expenses.size(); i++) {
-                Expense ex = expenses.get(i);
-                System.out.println((i + 1) + ".  " + ex);
-            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         System.out.println("Returning to previous menu....\n");
     }
