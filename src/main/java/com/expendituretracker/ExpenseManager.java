@@ -223,31 +223,47 @@ public class ExpenseManager {
     }
 
     public static void deleteExpenses() {
-        if (expenses.isEmpty()) {
-            System.out.println("No expenses to delete.");
-            return;
-        }
+        try (Connection connection = DatabaseConnection.createConnection()) {
 
-        String ip;
-        int exNo;
-        while (true) {
-            System.out.print("Enter the expense number to be delete: ");
-            ip = sc.next();
-            try {
-                exNo = Integer.parseInt(ip);
-                if (exNo > 0 && exNo <= expenses.size()) {
-                    expenses.remove(exNo - 1);
-                    System.out.println("Expense deleted...");
-                    saveExpenses();
-                    break;
-                } else {
-                    System.out.println("Invalid expense number.");
+            System.out.println("Connected successfully!");
+            System.out.println(connection);
+            Statement st = connection.createStatement();
+            ResultSet rs = st.executeQuery("SELECT COUNT(*) AS total_count FROM expenses");
+
+            if (rs.next() && rs.getInt("total_count") == 0) {
+                System.out.println("There are no expenses to delete...returning to menu");
+                return;
+            }
+
+            String ip;
+            int exNo;
+            int total_count = rs.getInt("total_count");
+            while (true) {
+                System.out.print("Enter the expense id to be delete: ");
+                ip = sc.next();
+                try {
+                    exNo = Integer.parseInt(ip);
+                    if (exNo > 0 && exNo <= total_count) {
+                        String sql = "DELETE FROM expenses WHERE expense_id = ?";
+                        PreparedStatement ps = connection.prepareStatement(sql);
+                        ps.setInt(1, exNo);
+                        int rows = ps.executeUpdate();
+                        if(rows > 0){
+                            System.out.println("Expense inserted.");
+                        }
+                        break;
+                    } else {
+                        System.out.println("Invalid expense number.");
+                    }
+                }
+                catch (Exception e){
+                    System.out.println("Input should be a number. Try again ");
                 }
             }
-            catch (Exception e){
-                System.out.println("Input should be a number. Try again ");
-            }
+        } catch  (Exception e) {
+            e.printStackTrace();
         }
+
         System.out.println("Returning to main menu! ");
     }
 
