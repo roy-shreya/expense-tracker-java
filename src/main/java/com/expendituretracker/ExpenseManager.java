@@ -200,20 +200,26 @@ public class ExpenseManager {
     }
 
     public static void totalExpenses(){
-        double total = 0.0;
-        HashMap<Category, Double> categoryTotals = new HashMap<>();
-        for (Expense ex : expenses) {
-            total += ex.getAmount();
-            categoryTotals.put(ex.getCategory(),
-                    categoryTotals.getOrDefault(ex.getCategory(),0.0) + ex.getAmount()
-            );
-        }
 
-        System.out.println("Total Expenses: ₹" + total);
-        System.out.println("\nCategory Wise Totals:");
-        for (Category category : categoryTotals.keySet()) {
-            System.out.println(category + " : ₹" + categoryTotals.get(category));
+        try (Connection connection = DatabaseConnection.createConnection()) {
+
+            System.out.println("Connected successfully!");
+            System.out.println(connection);
+            Statement st = connection.createStatement();
+            ResultSet rs = st.executeQuery("SELECT SUM(amount) AS total FROM expenses");
+            if (rs.next()) {
+                double total = rs.getDouble("total");
+                System.out.println("Total Expenses: ₹" + total);
+            }
+            System.out.println("\nCategory Wise Totals:");
+            rs = st.executeQuery("SELECT SUM(amount) as total, category FROM expenses GROUP BY category");
+            while(rs.next()){
+                System.out.println(rs.getString("category") + " : ₹" + rs.getDouble("total"));
+            }
+        } catch  (Exception e) {
+            e.printStackTrace();
         }
+        System.out.println("Returning to previous menu....\n");
     }
 
     public static void deleteExpenses() {
