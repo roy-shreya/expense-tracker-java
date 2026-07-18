@@ -1,2 +1,0 @@
-FOOD,1000.0,None,2026-07-11
-SHOPPING,3500.0,Janhavi's wedding,2026-07-11
