@@ -195,15 +195,14 @@ public class ExpenseManager {
             System.out.println("Connected successfully!");
             System.out.println(connection);
             Statement st = connection.createStatement();
-            ResultSet rs = st.executeQuery("SELECT COUNT(*) AS total_count FROM expenses");
+            ResultSet rs = st.executeQuery("SELECT * FROM expenses");
 
-            if (rs.next() && rs.getInt("total_count") == 0) {
+            if (!rs.next()) {
                 System.out.println("There are no expenses to delete...returning to menu");
                 return;
             }
 
             int exNo;
-            int total_count = rs.getInt("total_count");
             while (true) {
                 System.out.print("Enter the expense id to be delete: ");
                 try {
@@ -238,20 +237,19 @@ public class ExpenseManager {
             System.out.println("Connected successfully!");
             System.out.println(connection);
             Statement st = connection.createStatement();
-            ResultSet rs = st.executeQuery("SELECT COUNT(*) AS total_count FROM expenses");
+            ResultSet rs = st.executeQuery("SELECT * FROM expenses");
 
-            if (rs.next() && rs.getInt("total_count") == 0) {
+            if (!rs.next()) {
                 System.out.println("There are no expenses to edit...returning to menu");
                 return;
             }
 
             int exNo;
-            int total_count = rs.getInt("total_count");
             while (true) {
                 System.out.print("Enter expense number to edit: ");
                 try {
                     exNo = sc.nextInt();
-                    if (exNo > 0 && exNo <= total_count) {
+                    if (exNo > 0) {
                         Category category = getCategoryInput();
                         double amount = getAmountInput();
                         String note = getNoteInput();
