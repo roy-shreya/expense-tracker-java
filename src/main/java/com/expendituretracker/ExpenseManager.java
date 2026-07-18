@@ -8,8 +8,9 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
 
+import static java.util.function.Predicate.not;
+
 public class ExpenseManager {
-    static ArrayList<Expense> expenses = new ArrayList<>();
     static Scanner sc = new Scanner(System.in);
 
     public static void showMenu() throws IOException {
@@ -53,39 +54,6 @@ public class ExpenseManager {
                     }
                 }
             }
-    }
-
-    public static void loadExpenses() throws IOException {
-        File file = new File("expenses.txt");
-
-        if (!file.exists()) {
-            System.out.println("File not found....\n");
-            return;
-        }
-
-        Scanner reader = new Scanner(file);
-        while(reader.hasNextLine()) {
-            String line = reader.nextLine();
-            String[] parts = line.split(",");
-            Expense ex = new Expense(
-                    Category.valueOf(parts[0]),
-                    Double.parseDouble(parts[1]),
-                    parts[2],
-                    LocalDate.parse(parts[3])
-            );
-            expenses.add(ex);
-        }
-        System.out.println("Load Successful....\n");
-        reader.close();
-    }
-
-    public static void saveExpenses() throws IOException {
-        FileWriter writer = new FileWriter("expenses.txt");
-
-        for (Expense ex : expenses) {
-            writer.write(ex.getCategory().name() + "," + ex.getAmount() + "," + ex.getNote() +  "," + ex.getDate() + "\n");
-        }
-        writer.close();
     }
 
     public static void addExpense() throws IOException {
@@ -132,7 +100,7 @@ public class ExpenseManager {
             System.out.println("Connected successfully!");
             System.out.println(connection);
             Statement st = connection.createStatement();
-            ResultSet rs = st.executeQuery("SELECT * FROM expenses");
+            ResultSet rs = st.executeQuery("SELECT * FROM expenses ORDER BY expense_id");
 
             if (!rs.next()) {
                 System.out.println("There are no expenses...returning to menu");
@@ -150,7 +118,6 @@ public class ExpenseManager {
                             System.out.print("Enter a option: ");
                             int sortOption = sc.nextInt();
                             if (sortOption >= 1 && sortOption <= 3) {
-                                System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
                                 switch (sortOption) {
                                     case 1 -> rs = st.executeQuery("SELECT * FROM expenses ORDER BY category");
                                     case 2 -> rs = st.executeQuery("SELECT * FROM expenses ORDER BY amount");
@@ -235,22 +202,19 @@ public class ExpenseManager {
                 return;
             }
 
-            String ip;
             int exNo;
             int total_count = rs.getInt("total_count");
             while (true) {
                 System.out.print("Enter the expense id to be delete: ");
-                ip = sc.next();
                 try {
-                    exNo = Integer.parseInt(ip);
-                    if (exNo > 0 && exNo <= total_count) {
+                    exNo = sc.nextInt();
+                    if (exNo > 0 ) {
                         String sql = "DELETE FROM expenses WHERE expense_id = ?";
                         PreparedStatement ps = connection.prepareStatement(sql);
                         ps.setInt(1, exNo);
                         int rows = ps.executeUpdate();
-                        if(rows > 0){
-                            System.out.println("Expense inserted.");
-                        }
+                        if(rows > 0) System.out.println("Expense deleted.");
+                        else System.out.println("Expense id not found.");
                         break;
                     } else {
                         System.out.println("Invalid expense number.");
@@ -258,6 +222,7 @@ public class ExpenseManager {
                 }
                 catch (Exception e){
                     System.out.println("Input should be a number. Try again ");
+                    sc.nextLine();
                 }
             }
         } catch  (Exception e) {
@@ -268,93 +233,150 @@ public class ExpenseManager {
     }
 
     public static void editExpense() throws IOException {
-        if (expenses.isEmpty()) {
-            System.out.println("No expenses to edit.");
-            return;
-        }
-        viewExpenses();
-        int exNo;
-        while (true) {
-            System.out.print("Enter expense number to edit: ");
-            try {
-                exNo = sc.nextInt();
-                if (exNo > 0 && exNo <= expenses.size()) {
-                    Expense ex = expenses.get(exNo - 1);
-                    ex.setAmount(getAmountInput());
-                    ex.setNote(getNoteInput());
-                    System.out.println("Expense updated");
-                    saveExpenses();
-                    break;
+        try (Connection connection = DatabaseConnection.createConnection()) {
+
+            System.out.println("Connected successfully!");
+            System.out.println(connection);
+            Statement st = connection.createStatement();
+            ResultSet rs = st.executeQuery("SELECT COUNT(*) AS total_count FROM expenses");
+
+            if (rs.next() && rs.getInt("total_count") == 0) {
+                System.out.println("There are no expenses to edit...returning to menu");
+                return;
+            }
+
+            int exNo;
+            int total_count = rs.getInt("total_count");
+            while (true) {
+                System.out.print("Enter expense number to edit: ");
+                try {
+                    exNo = sc.nextInt();
+                    if (exNo > 0 && exNo <= total_count) {
+                        Category category = getCategoryInput();
+                        double amount = getAmountInput();
+                        String note = getNoteInput();
+                        String sql = "UPDATE expenses SET category = ?, amount = ?, expense_date = ?, notes = ? WHERE expense_id = ?";
+                        PreparedStatement ps = connection.prepareStatement(sql);
+                        ps.setString(1, category.name());
+                        ps.setDouble(2, amount);
+                        ps.setDate(3, Date.valueOf(LocalDate.now()));
+                        ps.setString(4, note);
+                        ps.setInt(5, exNo);
+                        int rows = ps.executeUpdate();
+                        if(rows > 0) System.out.println("Expense updated");
+                        else System.out.println("Expense id not found.");
+                        break;
+                    }
+                    System.out.println("Invalid expense number. Try again.");
                 }
-                System.out.println("Invalid expense number. Try again.");
+                catch (InputMismatchException e) {
+                    System.out.println("Please enter a valid number. Try again.");
+                    sc.nextLine();
+                }
             }
-            catch (InputMismatchException e) {
-                System.out.println("Please enter a valid number. Try again.");
-                sc.nextLine();
-            }
+        } catch  (Exception e) {
+            e.printStackTrace();
         }
+
         System.out.println("Returning to previous menu...");
     }
 
     public static void monthlySummary() {
-        int monthNo;
-        String ip;
-        while (true) {
-            System.out.print("Enter month number (1-12): ");
-            ip = sc.next();
-            try {
-                monthNo = Integer.parseInt(ip);
-                if (monthNo >= 1 && monthNo <= 12) {
-                    break;
-                }
-                System.out.println("Invalid month number.");
-            }
-            catch (Exception e){
-                System.out.println("Month should be in numbers.");
-            }
-        }
+
         double total = 0;
-        HashMap<Category, Double> categoryTotals = new HashMap<>();
 
-        for (Expense ex : expenses) {
-            if (ex.getDate().getMonthValue() == monthNo) {
-                total += ex.getAmount();
-                categoryTotals.put(
-                        ex.getCategory(),
-                        categoryTotals.getOrDefault(ex.getCategory(),0.0) + ex.getAmount()
-                );
+        try (Connection connection = DatabaseConnection.createConnection()) {
+
+            System.out.println("Connected successfully!");
+            System.out.println(connection);
+            Statement st = connection.createStatement();
+            ResultSet rs = st.executeQuery("SELECT COUNT(*) AS total_count FROM expenses");
+
+            if (rs.next() && rs.getInt("total_count") == 0) {
+                System.out.println("There are no expenses...returning to menu");
+                return;
             }
+
+            int monthNo;
+            while (true) {
+                System.out.print("Enter month number (1-12): ");
+                try {
+                    monthNo = sc.nextInt();
+                    if (monthNo >= 1 && monthNo <= 12) {
+                        break;
+                    }
+                    System.out.println("Invalid month number.");
+                }
+                catch (Exception e){
+                    System.out.println("Month should be in numbers.");
+                    sc.nextLine();
+                }
+            }
+
+            String sql = """
+                    SELECT
+                        TO_CHAR(expense_date, 'Month YYYY') AS month,
+                        category, 
+                        SUM(amount) AS total_expenses
+                    FROM expenses
+                    WHERE EXTRACT(MONTH FROM expense_date) = ?
+                    GROUP BY 
+                        DATE_TRUNC('month', expense_date), 
+                        TO_CHAR(expense_date, 'Month YYYY'), 
+                        category 
+                    ORDER BY category;
+                    """;
+
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setInt(1, monthNo);
+            rs = ps.executeQuery();
+
+            System.out.println("\nMonthly Summary");
+            while (rs.next()) {
+                total += rs.getDouble("total_expenses");
+                System.out.println(rs.getString("category") + " : ₹" +rs.getDouble("total_expenses"));
+            }
+
+            System.out.println("\nTotal: ₹" + total + "\n");
+
+        } catch  (Exception e) {
+            e.printStackTrace();
         }
 
-        System.out.println("\nMonthly Summary");
-        for (Category category : categoryTotals.keySet()) {
-            System.out.println(category + " : ₹" +categoryTotals.get(category)
-            );
-        }
-        System.out.println("Total: ₹" + total + "\n");
+        System.out.println("Returning to main menu! ");
     }
 
     public static void searchExpense() {
-        if (expenses.isEmpty()) {
-            System.out.println("There are no expenses...returning to menu");
-            return;
-        }
-        int found = 0;
-        Category catInput = getCategoryInput();
-        System.out.println(catInput);
-        for(int i = 0; i < expenses.size(); i++){
-            Expense ex = expenses.get(i);
-            Category cat = ex.getCategory();
-            if (cat == catInput) {
-                if (found == 0 ) {
-                    System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
-                    found ++;
-                }
-                System.out.println((i + 1) + ".  " + ex);
+        try (Connection connection = DatabaseConnection.createConnection()) {
+
+            System.out.println("Connected successfully!");
+            System.out.println(connection);
+            Category catInput = getCategoryInput();
+            System.out.println(catInput);
+
+            String sql = "SELECT * FROM expenses where category = ?;";
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setString(1, catInput.name());
+            ResultSet rs = ps.executeQuery();
+
+            if (!rs.next()) {
+                System.out.println("No expense found for " + catInput + "....\n");
+                return;
             }
-        }
-        if (found == 0) {
-            System.out.println("No expense found for " + catInput + "....\n");
+
+            System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
+            do {
+                System.out.printf("%2s. %-15s : ₹%10.2f : %s : %s\n",
+                        rs.getInt("expense_id"),
+                        rs.getString("category"),
+                        rs.getDouble("amount"),
+                        rs.getDate("expense_date"),
+                        rs.getString("notes")
+                );
+            } while (rs.next());
+
+        } catch  (Exception e) {
+            e.printStackTrace();
         }
         System.out.println("Returning to previous menu....\n");
     }
