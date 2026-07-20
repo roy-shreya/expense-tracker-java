@@ -1,7 +1,5 @@
 package com.expendituretracker;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.*;
 import java.sql.Date;
@@ -67,6 +65,8 @@ public class ExpenseManager {
             amount = getAmountInput();
             note = getNoteInput();
 
+            Expense expense = new Expense(category, amount, note);
+
             try (Connection connection = DatabaseConnection.createConnection()) {
 
                 System.out.println("Connected successfully!");
@@ -75,10 +75,10 @@ public class ExpenseManager {
 
                 PreparedStatement ps = connection.prepareStatement(sql);
 
-                ps.setString(1, category.name());
-                ps.setDouble(2, amount);
-                ps.setDate(3, Date.valueOf(LocalDate.now()));
-                ps.setString(4, note);
+                ps.setString(1, expense.getCategory().name());
+                ps.setDouble(2, expense.getAmount());
+                ps.setDate(3, Date.valueOf(expense.getDate()));
+                ps.setString(4, expense.getNote());
 
                 int rows = ps.executeUpdate();
                 if(rows > 0){
@@ -138,25 +138,35 @@ public class ExpenseManager {
 
                     System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
                     while (rs.next()) {
-                        System.out.printf("%-2s. %-15s : ₹%10.2f : %s : %s\n",
-                                rs.getInt("expense_id"),
-                                rs.getString("category"),
+                        Expense expense = new Expense(
+                                Category.valueOf(rs.getString("category")),
                                 rs.getDouble("amount"),
-                                rs.getDate("expense_date"),
-                                rs.getString("notes")
+                                rs.getString("notes"),
+                                rs.getDate("expense_date").toLocalDate()
                         );
+                        System.out.printf("%-2s. %-15s : ₹%10.2f : %s : %s%n",
+                                rs.getInt("expense_id"),
+                                expense.getCategory(),
+                                expense.getAmount(),
+                                expense.getDate(),
+                                expense.getNote());
                     }
                 }
                 else {
                     System.out.printf("No. %-15s : %-11s : %-10s : %s\n", "Category", "Amount", "Date", "Note");
                     do {
-                        System.out.printf("%2s. %-15s : ₹%10.2f : %s : %s\n",
-                                rs.getInt("expense_id"),
-                                rs.getString("category"),
+                        Expense expense = new Expense(
+                                Category.valueOf(rs.getString("category")),
                                 rs.getDouble("amount"),
-                                rs.getDate("expense_date"),
-                                rs.getString("notes")
+                                rs.getString("notes"),
+                                rs.getDate("expense_date").toLocalDate()
                         );
+                        System.out.printf("%-2s. %-15s : ₹%10.2f : %s : %s%n",
+                                rs.getInt("expense_id"),
+                                expense.getCategory(),
+                                expense.getAmount(),
+                                expense.getDate(),
+                                expense.getNote());
                     } while (rs.next());
                 }
             }
@@ -253,14 +263,18 @@ public class ExpenseManager {
                         Category category = getCategoryInput();
                         double amount = getAmountInput();
                         String note = getNoteInput();
+
+                        Expense expense = new Expense(category, amount, note);
+
                         String sql = "UPDATE expenses SET category = ?, amount = ?, expense_date = ?, notes = ? WHERE expense_id = ?";
                         PreparedStatement ps = connection.prepareStatement(sql);
-                        ps.setString(1, category.name());
-                        ps.setDouble(2, amount);
-                        ps.setDate(3, Date.valueOf(LocalDate.now()));
-                        ps.setString(4, note);
+                        ps.setString(1, expense.getCategory().name());
+                        ps.setDouble(2, expense.getAmount());
+                        ps.setDate(3, Date.valueOf(expense.getDate()));
+                        ps.setString(4, expense.getNote());
                         ps.setInt(5, exNo);
                         int rows = ps.executeUpdate();
+
                         if(rows > 0) System.out.println("Expense updated");
                         else System.out.println("Expense id not found.");
                         break;
